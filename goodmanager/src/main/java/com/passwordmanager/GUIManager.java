@@ -329,6 +329,11 @@ public class GUIManager extends JFrame {
                     String account = parts[1];
                     String password = parts[2];
                     String category = parts[3];
+                    // 檢查是否重複
+                    if (manager.isDuplicate(site, account)) {
+                        // 跳過重複項目
+                        continue;
+                    }
                     manager.addPassword(site, account, password, category, encryptionKey);
                 }
             }
