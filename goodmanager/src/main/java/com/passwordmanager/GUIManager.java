@@ -24,19 +24,44 @@ public class GUIManager extends JFrame {
     private PasswordManager manager;
     private JTable table;
     private DefaultTableModel tableModel;
-    private static final String PASSWORD_FILE = "passwords.json";
+    private String PASSWORD_FILE; // 動態設定檔案路徑
     private static final String KEY_FILE = "key.dat";
-    private static final String EXPORT_FILE = "exported_passwords.csv";
-    private static final String IMPORT_FILE = "imported_passwords.csv";
-    private String encryptionKey = "defaultEncryptionKey123456"; // Simplified encryption key
+    private String encryptionKey;
     private static final String[] CATEGORIES = {"Games", "Search Engines", "Social Media", "Streaming", "Others"};
 
-    public GUIManager(PasswordManager manager) {
+    public GUIManager(PasswordManager manager, String username) {
         this.manager = manager;
         setTitle("Password Manager");
         setSize(1000, 400);
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setDefaultCloseOperation(DO_NOTHING_ON_CLOSE); // 改為不直接關閉
         setLocationRelativeTo(null);
+
+        // 確保在關閉時提示是否存檔
+        addWindowListener(new java.awt.event.WindowAdapter() {
+            public void windowClosing(java.awt.event.WindowEvent e) {
+                int option = JOptionPane.showConfirmDialog(GUIManager.this, "Do you want to save changes before exiting?", "Exit Confirmation", JOptionPane.YES_NO_CANCEL_OPTION);
+                if (option == JOptionPane.YES_OPTION) {
+                    savePasswords(); // 存檔
+                    System.exit(0);
+                } else if (option == JOptionPane.NO_OPTION) {
+                    System.exit(0); // 不存檔直接關閉
+                }
+                // 取消則不關閉
+            }
+        });
+
+        // 動態設定檔案路徑
+        if (!username.equals("guest")) {
+            String userDir = "users/" + username;
+            File dir = new File(userDir);
+            if (!dir.exists()) dir.mkdirs(); // 若資料夾不存在則創建
+            PASSWORD_FILE = userDir + "/passwords.json"; // 使用者專屬檔案
+        } else {
+            PASSWORD_FILE = null; // 訪客模式，僅記憶體儲存
+        }
+
+        // 設定標題
+        setTitle(username.equals("guest") ? "Password Manager - Guest Mode" : "Password Manager - " + username);
 
         try {
             encryptionKey = loadKey();
@@ -62,6 +87,7 @@ public class GUIManager extends JFrame {
         JButton showAllButton = new JButton("Show All");
         JButton exportButton = new JButton("Export");
         JButton importButton = new JButton("Import");
+        JButton saveButton = new JButton("Save"); // 新增存檔按鈕
 
         addButton.addActionListener(e -> addPassword());
         deleteButton.addActionListener(e -> deletePassword());
@@ -72,6 +98,7 @@ public class GUIManager extends JFrame {
         showAllButton.addActionListener(e -> loadAllPasswords());
         exportButton.addActionListener(e -> exportPasswords());
         importButton.addActionListener(e -> importPasswords());
+        saveButton.addActionListener(e -> savePasswords()); // 存檔按鈕事件
 
         JPanel buttonPanel = new JPanel();
         buttonPanel.add(addButton);
@@ -83,13 +110,18 @@ public class GUIManager extends JFrame {
         buttonPanel.add(showAllButton);
         buttonPanel.add(exportButton);
         buttonPanel.add(importButton);
+        buttonPanel.add(saveButton); // 加入按鈕到面板
 
         add(scrollPane, BorderLayout.CENTER);
         add(buttonPanel, BorderLayout.SOUTH);
-        manager.loadPasswords(PASSWORD_FILE, encryptionKey);
+
+        // 僅在非訪客模式下載入密碼資料
+        if (PASSWORD_FILE != null) {
+            manager.loadPasswords(PASSWORD_FILE, encryptionKey);
+        }
+
         setVisible(true);
     }
-    
     private void addPassword() {
         JTextField siteField = new JTextField();
         JTextField accountField = new JTextField();
@@ -117,7 +149,6 @@ public class GUIManager extends JFrame {
                 }
 
                 manager.addPassword(site, account, password, category, encryptionKey);
-                manager.savePasswords(PASSWORD_FILE,encryptionKey);
                 loadAllPasswords();
             } catch (Exception e) {
                 JOptionPane.showMessageDialog(this, "Failed to save password!", "Error", JOptionPane.ERROR_MESSAGE);
@@ -288,15 +319,45 @@ public class GUIManager extends JFrame {
         loadAllPasswords();
     }
 
+    
     private void savePasswords() {
-        try (Writer writer = new FileWriter(PASSWORD_FILE)) {
+        if (PASSWORD_FILE == null) {
+            JOptionPane.showMessageDialog(this, "Guest mode - No save allowed!", "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        try {
             Gson gson = new Gson();
-            gson.toJson(manager.getPasswords(), writer);
+
+            // 讀取現有資料
+            List<PasswordManager.PasswordEntry> existingPasswords = new ArrayList<>();
+            try (Reader reader = new FileReader(PASSWORD_FILE)) {
+                existingPasswords = gson.fromJson(reader, new TypeToken<List<PasswordManager.PasswordEntry>>() {}.getType());
+            } catch (FileNotFoundException e) {
+                // 檔案不存在則略過
+            }
+
+            // 獲取新資料
+            List<PasswordManager.PasswordEntry> newPasswords = manager.getPasswords();
+
+            // 合併資料
+            for (PasswordManager.PasswordEntry newEntry : newPasswords) {
+                if (!existingPasswords.stream().anyMatch(e -> e.getSite().equals(newEntry.getSite()) && e.getAccount().equals(newEntry.getAccount()))) {
+                    existingPasswords.add(newEntry);
+                }
+            }
+
+            // 儲存結果
+            try (Writer writer = new FileWriter(PASSWORD_FILE)) {
+                gson.toJson(existingPasswords, writer);
+            }
+
+            JOptionPane.showMessageDialog(this, "Passwords saved successfully!", "Success", JOptionPane.INFORMATION_MESSAGE);
         } catch (IOException e) {
             JOptionPane.showMessageDialog(this, "Failed to save passwords!", "Error", JOptionPane.ERROR_MESSAGE);
             e.printStackTrace();
         }
     }
+
 
     // private void loadPasswords() {
     //     try (Reader reader = new FileReader(PASSWORD_FILE)) {
@@ -358,7 +419,7 @@ public class GUIManager extends JFrame {
                         manager.addPassword(site, account, password, category, encryptionKey);
                     }
                 }
-                savePasswords();
+
                 loadAllPasswords();
                 JOptionPane.showMessageDialog(this, "Passwords imported successfully!", "Import", JOptionPane.INFORMATION_MESSAGE);
             } catch (Exception e) {

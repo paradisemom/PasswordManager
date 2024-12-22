@@ -117,7 +117,6 @@ public class PasswordManager {
         String key = site + "|" + account;
         passwordList.removeIf(entry -> entry.getSite().equals(site) && entry.getAccount().equals(account));
         passwordMap.remove(key);
-        savePasswords("passwords.json", "defaultEncryptionKey123456"); // Save changes after deletion
     }
 
     public void savePasswords(String filePath, String encryptionKey) {
