@@ -1,6 +1,8 @@
 package com.passwordmanager;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
+
+
 import java.awt.*;
 import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.StringSelection;
@@ -14,6 +16,7 @@ import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
+import java.util.Iterator;
 import java.io.*;
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
@@ -161,7 +164,6 @@ public class GUIManager extends JFrame {
             String site = (String) tableModel.getValueAt(selectedRow, 0);
             String account = (String) tableModel.getValueAt(selectedRow, 1);
             manager.deletePassword(site, account);
-            manager.savePasswords(PASSWORD_FILE,encryptionKey);
             updateTable();
         } else {
             JOptionPane.showMessageDialog(this, "Please select a row to delete.");
@@ -271,6 +273,25 @@ public class GUIManager extends JFrame {
         JTextField passwordPreview = new JTextField();
         passwordPreview.setEditable(false);
     
+        // 更新密碼預覽與強度的方法
+        Runnable updatePasswordPreview = () -> updateGeneratedPassword(
+            passwordPreview,
+            strengthBar,
+            lengthSpinner,
+            includeUppercase,
+            includeLowercase,
+            includeDigits,
+            includeSpecialChars
+        );
+    
+        // 為所有控制元件新增變更事件監聽器
+        lengthSpinner.addChangeListener(e -> updatePasswordPreview.run());
+        includeUppercase.addActionListener(e -> updatePasswordPreview.run());
+        includeLowercase.addActionListener(e -> updatePasswordPreview.run());
+        includeDigits.addActionListener(e -> updatePasswordPreview.run());
+        includeSpecialChars.addActionListener(e -> updatePasswordPreview.run());
+    
+        // 表單輸入欄位
         Object[] fields = {
             "Site:", siteField,
             "Account:", accountField,
@@ -281,8 +302,10 @@ public class GUIManager extends JFrame {
             strengthLabel, strengthBar
         };
     
-        updateGeneratedPassword(passwordPreview, strengthBar, lengthSpinner, includeUppercase, includeLowercase, includeDigits, includeSpecialChars);
+        // 初始生成預覽密碼
+        updatePasswordPreview.run();
     
+        // 按下確認按鈕的動作
         int option = JOptionPane.showConfirmDialog(this, fields, "Generate Password", JOptionPane.OK_CANCEL_OPTION);
         if (option == JOptionPane.OK_OPTION) {
             try {
@@ -291,7 +314,7 @@ public class GUIManager extends JFrame {
                 String category = (String) categoryBox.getSelectedItem();
                 String generatedPassword = passwordPreview.getText();
     
-                // 檢查重複資料
+                // 檢查是否重複
                 if (manager.isDuplicate(site, account)) {
                     JOptionPane.showMessageDialog(this, "Duplicate entry detected!", "Warning", JOptionPane.WARNING_MESSAGE);
                     return; // 跳過重複項目
@@ -299,7 +322,8 @@ public class GUIManager extends JFrame {
     
                 // 添加資料但不存檔
                 manager.addPassword(site, account, generatedPassword, category, encryptionKey);
-                loadAllPasswords(); // 更新顯示但不儲存
+                updateTable(); // 更新顯示但不儲存
+    
                 JOptionPane.showMessageDialog(this, "Generated Password: " + generatedPassword, "Success", JOptionPane.INFORMATION_MESSAGE);
     
             } catch (Exception e) {
@@ -339,7 +363,17 @@ public class GUIManager extends JFrame {
             // 獲取新資料
             List<PasswordManager.PasswordEntry> newPasswords = manager.getPasswords();
 
-            // 合併資料
+            // 合併與刪除不存在資料
+            Iterator<PasswordManager.PasswordEntry> iterator = existingPasswords.iterator();
+            while (iterator.hasNext()) {
+                PasswordManager.PasswordEntry entry = iterator.next();
+                boolean exists = newPasswords.stream().anyMatch(e -> e.getSite().equals(entry.getSite()) && e.getAccount().equals(entry.getAccount()));
+                if (!exists) {
+                    iterator.remove(); // 移除舊資料
+                }
+            }
+
+            // 加入新資料
             for (PasswordManager.PasswordEntry newEntry : newPasswords) {
                 if (!existingPasswords.stream().anyMatch(e -> e.getSite().equals(newEntry.getSite()) && e.getAccount().equals(newEntry.getAccount()))) {
                     existingPasswords.add(newEntry);
