@@ -27,6 +27,7 @@ public class GUIManager extends JFrame {
     private static final String PASSWORD_FILE = "passwords.json";
     private static final String KEY_FILE = "key.dat";
     private static final String EXPORT_FILE = "exported_passwords.csv";
+    private static final String IMPORT_FILE = "imported_passwords.csv";
     private String encryptionKey = "defaultEncryptionKey123456"; // Simplified encryption key
     private static final String[] CATEGORIES = {"Games", "Search Engines", "Social Media", "Streaming", "Others"};
 
@@ -60,6 +61,7 @@ public class GUIManager extends JFrame {
         JButton searchCategoryButton = new JButton("Search by Category");
         JButton showAllButton = new JButton("Show All");
         JButton exportButton = new JButton("Export");
+        JButton importButton = new JButton("Import");
 
         addButton.addActionListener(e -> addPassword());
         deleteButton.addActionListener(e -> deletePassword());
@@ -69,6 +71,7 @@ public class GUIManager extends JFrame {
         searchCategoryButton.addActionListener(e -> searchByCategory());
         showAllButton.addActionListener(e -> loadAllPasswords());
         exportButton.addActionListener(e -> exportPasswords());
+        importButton.addActionListener(e -> importPasswords());
 
         JPanel buttonPanel = new JPanel();
         buttonPanel.add(addButton);
@@ -79,6 +82,7 @@ public class GUIManager extends JFrame {
         buttonPanel.add(searchCategoryButton);
         buttonPanel.add(showAllButton);
         buttonPanel.add(exportButton);
+        buttonPanel.add(importButton);
 
         add(scrollPane, BorderLayout.CENTER);
         add(buttonPanel, BorderLayout.SOUTH);
@@ -308,6 +312,32 @@ public class GUIManager extends JFrame {
             JOptionPane.showMessageDialog(this, "Passwords exported successfully!", "Export", JOptionPane.INFORMATION_MESSAGE);
         } catch (FileNotFoundException e) {
             JOptionPane.showMessageDialog(this, "Failed to export passwords!", "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+    private void importPasswords() {
+        try (BufferedReader reader = new BufferedReader(new FileReader(IMPORT_FILE))) {
+            String line;
+            boolean isHeader = true;
+            while ((line = reader.readLine()) != null) {
+                if (isHeader) {
+                    isHeader = false; // Skip header row
+                    continue;
+                }
+                String[] parts = line.split(",");
+                if (parts.length == 4) {
+                    String site = parts[0];
+                    String account = parts[1];
+                    String password = parts[2];
+                    String category = parts[3];
+                    manager.addPassword(site, account, password, category, encryptionKey);
+                }
+            }
+            savePasswords();
+            loadAllPasswords();
+            JOptionPane.showMessageDialog(this, "Passwords imported successfully!", "Import", JOptionPane.INFORMATION_MESSAGE);
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Failed to import passwords!", "Error", JOptionPane.ERROR_MESSAGE);
+            e.printStackTrace();
         }
     }
 
