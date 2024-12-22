@@ -138,31 +138,45 @@ public class GUIManager extends JFrame {
     }
     private void updatePassword() {
         int selectedRow = table.getSelectedRow();
-        if (selectedRow >= 0) {
-            String site = (String) tableModel.getValueAt(selectedRow, 0);
-            String account = (String) tableModel.getValueAt(selectedRow, 1);
-            JTextField passwordField = new JTextField();
-            JComboBox<String> categoryBox = new JComboBox<>(CATEGORIES);
+        if (selectedRow == -1) {
+            JOptionPane.showMessageDialog(this, "No password selected!", "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
 
-            Object[] fields = {
-                "New Password:", passwordField,
-                "Category:", categoryBox
-            };
+        JTextField siteField = new JTextField((String) tableModel.getValueAt(selectedRow, 0));
+        JTextField accountField = new JTextField((String) tableModel.getValueAt(selectedRow, 1));
+        JTextField passwordField = new JTextField();
+        JComboBox<String> categoryBox = new JComboBox<>(CATEGORIES);
+        categoryBox.setSelectedItem(tableModel.getValueAt(selectedRow, 3));
 
-            int option = JOptionPane.showConfirmDialog(this, fields, "Update Password", JOptionPane.OK_CANCEL_OPTION);
-            if (option == JOptionPane.OK_OPTION) {
-                try {
-                    String password = passwordField.getText();
-                    String category = (String) categoryBox.getSelectedItem();
-                    manager.updatePassword(site, account, password, category, encryptionKey);
-                    savePasswords();
-                    loadAllPasswords();
-                } catch (Exception e) {
-                    JOptionPane.showMessageDialog(this, "Failed to update password!", "Error", JOptionPane.ERROR_MESSAGE);
+        Object[] fields = {
+            "Site:", siteField,
+            "Account:", accountField,
+            "New Password:", passwordField,
+            "Category:", categoryBox
+        };
+
+        int option = JOptionPane.showConfirmDialog(this, fields, "Update Password", JOptionPane.OK_CANCEL_OPTION);
+        if (option == JOptionPane.OK_OPTION) {
+            try {
+                String site = siteField.getText();
+                String account = accountField.getText();
+                String newPassword = passwordField.getText();
+                String category = (String) categoryBox.getSelectedItem();
+
+                if (!manager.isDuplicate(site, account)) {
+                    JOptionPane.showMessageDialog(this, "Entry does not exist!", "Error", JOptionPane.ERROR_MESSAGE);
+                    return;
                 }
+
+                // 更新密碼但不存檔
+                manager.updatePassword(site, account, newPassword, category, encryptionKey);
+                loadAllPasswords(); // 更新顯示但不儲存
+                JOptionPane.showMessageDialog(this, "Password updated successfully!", "Success", JOptionPane.INFORMATION_MESSAGE);
+
+            } catch (Exception e) {
+                JOptionPane.showMessageDialog(this, "Failed to update password!", "Error", JOptionPane.ERROR_MESSAGE);
             }
-        } else {
-            JOptionPane.showMessageDialog(this, "Please select a row to update.");
         }
     }
     private void loadAllPasswords() {
@@ -222,11 +236,10 @@ public class GUIManager extends JFrame {
         JCheckBox includeSpecialChars = new JCheckBox("Special Characters", false);
         JLabel strengthLabel = new JLabel("Password Strength: ");
         JProgressBar strengthBar = new JProgressBar(0, 100);
-
-        strengthBar.setStringPainted(true);
+    
         JTextField passwordPreview = new JTextField();
         passwordPreview.setEditable(false);
-
+    
         Object[] fields = {
             "Site:", siteField,
             "Account:", accountField,
@@ -236,32 +249,28 @@ public class GUIManager extends JFrame {
             "Password Preview:", passwordPreview,
             strengthLabel, strengthBar
         };
-
-        lengthSpinner.addChangeListener(e -> updateGeneratedPassword(passwordPreview, strengthBar, lengthSpinner, includeUppercase, includeLowercase, includeDigits, includeSpecialChars));
-        includeUppercase.addActionListener(e -> updateGeneratedPassword(passwordPreview, strengthBar, lengthSpinner, includeUppercase, includeLowercase, includeDigits, includeSpecialChars));
-        includeLowercase.addActionListener(e -> updateGeneratedPassword(passwordPreview, strengthBar, lengthSpinner, includeUppercase, includeLowercase, includeDigits, includeSpecialChars));
-        includeDigits.addActionListener(e -> updateGeneratedPassword(passwordPreview, strengthBar, lengthSpinner, includeUppercase, includeLowercase, includeDigits, includeSpecialChars));
-        includeSpecialChars.addActionListener(e -> updateGeneratedPassword(passwordPreview, strengthBar, lengthSpinner, includeUppercase, includeLowercase, includeDigits, includeSpecialChars));
-
+    
         updateGeneratedPassword(passwordPreview, strengthBar, lengthSpinner, includeUppercase, includeLowercase, includeDigits, includeSpecialChars);
-
+    
         int option = JOptionPane.showConfirmDialog(this, fields, "Generate Password", JOptionPane.OK_CANCEL_OPTION);
         if (option == JOptionPane.OK_OPTION) {
             try {
-                String generatedPassword = passwordPreview.getText();
                 String site = siteField.getText();
                 String account = accountField.getText();
                 String category = (String) categoryBox.getSelectedItem();
-
+                String generatedPassword = passwordPreview.getText();
+    
+                // 檢查重複資料
                 if (manager.isDuplicate(site, account)) {
                     JOptionPane.showMessageDialog(this, "Duplicate entry detected!", "Warning", JOptionPane.WARNING_MESSAGE);
-                    return;
+                    return; // 跳過重複項目
                 }
-
+    
+                // 添加資料但不存檔
                 manager.addPassword(site, account, generatedPassword, category, encryptionKey);
-                savePasswords();
-                loadAllPasswords();
+                loadAllPasswords(); // 更新顯示但不儲存
                 JOptionPane.showMessageDialog(this, "Generated Password: " + generatedPassword, "Success", JOptionPane.INFORMATION_MESSAGE);
+    
             } catch (Exception e) {
                 JOptionPane.showMessageDialog(this, "Failed to generate and add password!", "Error", JOptionPane.ERROR_MESSAGE);
             }
@@ -299,50 +308,63 @@ public class GUIManager extends JFrame {
     //     }
     // }
     private void exportPasswords() {
-        try (PrintWriter writer = new PrintWriter(new File(EXPORT_FILE))) {
-            writer.println("Site,Account,Password,Category");
-            for (PasswordManager.PasswordEntry entry : manager.getPasswords()) {
-                try {
-                    String decryptedPassword = Utils.decrypt(entry.getPassword(), encryptionKey);
-                    writer.println(entry.getSite() + "," + entry.getAccount() + "," + decryptedPassword + "," + entry.getCategory());
-                } catch (Exception e) {
-                    writer.println(entry.getSite() + "," + entry.getAccount() + "," + entry.getPassword() + "," + entry.getCategory());
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setDialogTitle("Save Export File");
+        fileChooser.setSelectedFile(new File("exported_passwords.csv"));
+        int userSelection = fileChooser.showSaveDialog(this);
+        if (userSelection == JFileChooser.APPROVE_OPTION) {
+            File fileToSave = fileChooser.getSelectedFile();
+            try (PrintWriter writer = new PrintWriter(fileToSave)) {
+                writer.println("Site,Account,Password,Category");
+                for (PasswordManager.PasswordEntry entry : manager.getPasswords()) {
+                    try {
+                        String decryptedPassword = Utils.decrypt(entry.getPassword(), encryptionKey);
+                        writer.println(entry.getSite() + "," + entry.getAccount() + "," + decryptedPassword + "," + entry.getCategory());
+                    } catch (Exception e) {
+                        writer.println(entry.getSite() + "," + entry.getAccount() + "," + entry.getPassword() + "," + entry.getCategory());
+                    }
                 }
+                JOptionPane.showMessageDialog(this, "Passwords exported successfully!", "Export", JOptionPane.INFORMATION_MESSAGE);
+            } catch (FileNotFoundException e) {
+                JOptionPane.showMessageDialog(this, "Failed to export passwords!", "Error", JOptionPane.ERROR_MESSAGE);
             }
-            JOptionPane.showMessageDialog(this, "Passwords exported successfully!", "Export", JOptionPane.INFORMATION_MESSAGE);
-        } catch (FileNotFoundException e) {
-            JOptionPane.showMessageDialog(this, "Failed to export passwords!", "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
     private void importPasswords() {
-        try (BufferedReader reader = new BufferedReader(new FileReader(IMPORT_FILE))) {
-            String line;
-            boolean isHeader = true;
-            while ((line = reader.readLine()) != null) {
-                if (isHeader) {
-                    isHeader = false; // Skip header row
-                    continue;
-                }
-                String[] parts = line.split(",");
-                if (parts.length == 4) {
-                    String site = parts[0];
-                    String account = parts[1];
-                    String password = parts[2];
-                    String category = parts[3];
-                    // 檢查是否重複
-                    if (manager.isDuplicate(site, account)) {
-                        // 跳過重複項目
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setDialogTitle("Select Import File");
+        int userSelection = fileChooser.showOpenDialog(this);
+        if (userSelection == JFileChooser.APPROVE_OPTION) {
+            File fileToImport = fileChooser.getSelectedFile();
+            try (BufferedReader reader = new BufferedReader(new FileReader(fileToImport))) {
+                String line;
+                boolean isHeader = true;
+                while ((line = reader.readLine()) != null) {
+                    if (isHeader) {
+                        isHeader = false; // Skip header row
                         continue;
                     }
-                    manager.addPassword(site, account, password, category, encryptionKey);
+                    String[] parts = line.split(",");
+                    if (parts.length == 4) {
+                        String site = parts[0];
+                        String account = parts[1];
+                        String password = parts[2];
+                        String category = parts[3];
+                        // 檢查是否重複
+                        if (manager.isDuplicate(site, account)) {
+                            // 跳過重複項目
+                            continue;
+                        }
+                        manager.addPassword(site, account, password, category, encryptionKey);
+                    }
                 }
+                savePasswords();
+                loadAllPasswords();
+                JOptionPane.showMessageDialog(this, "Passwords imported successfully!", "Import", JOptionPane.INFORMATION_MESSAGE);
+            } catch (Exception e) {
+                JOptionPane.showMessageDialog(this, "Failed to import passwords!", "Error", JOptionPane.ERROR_MESSAGE);
+                e.printStackTrace();
             }
-            savePasswords();
-            loadAllPasswords();
-            JOptionPane.showMessageDialog(this, "Passwords imported successfully!", "Import", JOptionPane.INFORMATION_MESSAGE);
-        } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Failed to import passwords!", "Error", JOptionPane.ERROR_MESSAGE);
-            e.printStackTrace();
         }
     }
 
