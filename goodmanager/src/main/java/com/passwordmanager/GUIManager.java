@@ -33,7 +33,7 @@ public class GUIManager extends JFrame {
     public GUIManager(PasswordManager manager) {
         this.manager = manager;
         setTitle("Password Manager");
-        setSize(700, 400);
+        setSize(1000, 400);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
@@ -59,6 +59,7 @@ public class GUIManager extends JFrame {
         JButton searchButton = new JButton("Search");
         JButton searchCategoryButton = new JButton("Search by Category");
         JButton showAllButton = new JButton("Show All");
+        JButton exportButton = new JButton("Export");
 
         addButton.addActionListener(e -> addPassword());
         deleteButton.addActionListener(e -> deletePassword());
@@ -67,6 +68,7 @@ public class GUIManager extends JFrame {
         searchButton.addActionListener(e -> searchPasswords());
         searchCategoryButton.addActionListener(e -> searchByCategory());
         showAllButton.addActionListener(e -> loadAllPasswords());
+        exportButton.addActionListener(e -> exportPasswords());
 
         JPanel buttonPanel = new JPanel();
         buttonPanel.add(addButton);
@@ -76,6 +78,7 @@ public class GUIManager extends JFrame {
         buttonPanel.add(searchButton);
         buttonPanel.add(searchCategoryButton);
         buttonPanel.add(showAllButton);
+        buttonPanel.add(exportButton);
 
         add(scrollPane, BorderLayout.CENTER);
         add(buttonPanel, BorderLayout.SOUTH);
@@ -291,6 +294,22 @@ public class GUIManager extends JFrame {
     //         e.printStackTrace();
     //     }
     // }
+    private void exportPasswords() {
+        try (PrintWriter writer = new PrintWriter(new File(EXPORT_FILE))) {
+            writer.println("Site,Account,Password,Category");
+            for (PasswordManager.PasswordEntry entry : manager.getPasswords()) {
+                try {
+                    String decryptedPassword = Utils.decrypt(entry.getPassword(), encryptionKey);
+                    writer.println(entry.getSite() + "," + entry.getAccount() + "," + decryptedPassword + "," + entry.getCategory());
+                } catch (Exception e) {
+                    writer.println(entry.getSite() + "," + entry.getAccount() + "," + entry.getPassword() + "," + entry.getCategory());
+                }
+            }
+            JOptionPane.showMessageDialog(this, "Passwords exported successfully!", "Export", JOptionPane.INFORMATION_MESSAGE);
+        } catch (FileNotFoundException e) {
+            JOptionPane.showMessageDialog(this, "Failed to export passwords!", "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
 
     private void saveKey(String key) throws IOException {
         try (FileWriter writer = new FileWriter(KEY_FILE)) {
