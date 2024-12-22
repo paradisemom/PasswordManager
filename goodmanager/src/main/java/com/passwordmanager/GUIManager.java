@@ -26,6 +26,7 @@ public class GUIManager extends JFrame {
     private DefaultTableModel tableModel;
     private static final String PASSWORD_FILE = "passwords.json";
     private static final String KEY_FILE = "key.dat";
+    private static final String EXPORT_FILE = "exported_passwords.csv";
     private String encryptionKey = "defaultEncryptionKey123456"; // Simplified encryption key
     private static final String[] CATEGORIES = {"Games", "Search Engines", "Social Media", "Streaming", "Others"};
 
@@ -212,25 +213,35 @@ public class GUIManager extends JFrame {
         JCheckBox includeLowercase = new JCheckBox("Lowercase", true);
         JCheckBox includeDigits = new JCheckBox("Digits", true);
         JCheckBox includeSpecialChars = new JCheckBox("Special Characters", false);
+        JLabel strengthLabel = new JLabel("Password Strength: ");
+        JProgressBar strengthBar = new JProgressBar(0, 100);
+
+        strengthBar.setStringPainted(true);
+        JTextField passwordPreview = new JTextField();
+        passwordPreview.setEditable(false);
 
         Object[] fields = {
             "Site:", siteField,
             "Account:", accountField,
             "Category:", categoryBox,
             "Password Length:", lengthSpinner,
-            "Include:", includeUppercase, includeLowercase, includeDigits, includeSpecialChars
+            "Include:", includeUppercase, includeLowercase, includeDigits, includeSpecialChars,
+            "Password Preview:", passwordPreview,
+            strengthLabel, strengthBar
         };
+
+        lengthSpinner.addChangeListener(e -> updateGeneratedPassword(passwordPreview, strengthBar, lengthSpinner, includeUppercase, includeLowercase, includeDigits, includeSpecialChars));
+        includeUppercase.addActionListener(e -> updateGeneratedPassword(passwordPreview, strengthBar, lengthSpinner, includeUppercase, includeLowercase, includeDigits, includeSpecialChars));
+        includeLowercase.addActionListener(e -> updateGeneratedPassword(passwordPreview, strengthBar, lengthSpinner, includeUppercase, includeLowercase, includeDigits, includeSpecialChars));
+        includeDigits.addActionListener(e -> updateGeneratedPassword(passwordPreview, strengthBar, lengthSpinner, includeUppercase, includeLowercase, includeDigits, includeSpecialChars));
+        includeSpecialChars.addActionListener(e -> updateGeneratedPassword(passwordPreview, strengthBar, lengthSpinner, includeUppercase, includeLowercase, includeDigits, includeSpecialChars));
+
+        updateGeneratedPassword(passwordPreview, strengthBar, lengthSpinner, includeUppercase, includeLowercase, includeDigits, includeSpecialChars);
 
         int option = JOptionPane.showConfirmDialog(this, fields, "Generate Password", JOptionPane.OK_CANCEL_OPTION);
         if (option == JOptionPane.OK_OPTION) {
             try {
-                int length = (int) lengthSpinner.getValue();
-                boolean useUppercase = includeUppercase.isSelected();
-                boolean useLowercase = includeLowercase.isSelected();
-                boolean useDigits = includeDigits.isSelected();
-                boolean useSpecial = includeSpecialChars.isSelected();
-
-                String generatedPassword = Utils.generatePassword(length, useUppercase, useLowercase, useDigits, useSpecial);
+                String generatedPassword = passwordPreview.getText();
                 String site = siteField.getText();
                 String account = accountField.getText();
                 String category = (String) categoryBox.getSelectedItem();
@@ -248,6 +259,14 @@ public class GUIManager extends JFrame {
                 JOptionPane.showMessageDialog(this, "Failed to generate and add password!", "Error", JOptionPane.ERROR_MESSAGE);
             }
         }
+    }
+    private void updateGeneratedPassword(JTextField preview, JProgressBar strengthBar, JSpinner length, JCheckBox upper, JCheckBox lower, JCheckBox digits, JCheckBox special) {
+        int len = (int) length.getValue();
+        String password = Utils.generatePassword(len, upper.isSelected(), lower.isSelected(), digits.isSelected(), special.isSelected());
+        preview.setText(password);
+        int strength = Utils.calculateStrength(password);
+        strengthBar.setValue(strength);
+        strengthBar.setString(strength + "%");
     }
     private void updateTable() {
         loadAllPasswords();
