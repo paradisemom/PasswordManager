@@ -12,10 +12,18 @@ import com.google.gson.reflect.TypeToken;
 
 import com.passwordmanager.*;
 
+import org.jfree.chart.ChartFactory;
+import org.jfree.chart.ChartPanel;
+import org.jfree.chart.JFreeChart;
+import org.jfree.data.category.DefaultCategoryDataset;
+import org.jfree.data.general.DefaultPieDataset;
+
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Iterator;
 import java.io.*;
 import javax.crypto.Cipher;
@@ -35,10 +43,10 @@ public class GUIManager extends JFrame {
     public GUIManager(PasswordManager manager, String username) {
         this.manager = manager;
         setTitle("Password Manager");
-        setSize(1000, 400);
+        setSize(1200, 400);
         setDefaultCloseOperation(DO_NOTHING_ON_CLOSE); // 改為不直接關閉
         setLocationRelativeTo(null);
-
+        applyDarkMode();
         // 確保在關閉時提示是否存檔
         addWindowListener(new java.awt.event.WindowAdapter() {
             public void windowClosing(java.awt.event.WindowEvent e) {
@@ -63,7 +71,6 @@ public class GUIManager extends JFrame {
             PASSWORD_FILE = null; // 訪客模式，僅記憶體儲存
         }
 
-        // 設定標題
         setTitle(username.equals("guest") ? "Password Manager - Guest Mode" : "Password Manager - " + username);
 
         try {
@@ -77,7 +84,8 @@ public class GUIManager extends JFrame {
             System.exit(1);
         }
 
-        tableModel = new DefaultTableModel(new String[]{"Site", "Account", "Password", "Category"}, 0);
+        // 增加密碼強度欄位
+        tableModel = new DefaultTableModel(new String[]{"Site", "Account", "Password", "Category", "Strength"}, 0);
         table = new JTable(tableModel);
         JScrollPane scrollPane = new JScrollPane(table);
 
@@ -91,6 +99,7 @@ public class GUIManager extends JFrame {
         JButton exportButton = new JButton("Export");
         JButton importButton = new JButton("Import");
         JButton saveButton = new JButton("Save"); // 新增存檔按鈕
+        JButton reportButton = new JButton("Generate Report");
 
         addButton.addActionListener(e -> addPassword());
         deleteButton.addActionListener(e -> deletePassword());
@@ -102,6 +111,7 @@ public class GUIManager extends JFrame {
         exportButton.addActionListener(e -> exportPasswords());
         importButton.addActionListener(e -> importPasswords());
         saveButton.addActionListener(e -> savePasswords()); // 存檔按鈕事件
+        reportButton.addActionListener(e -> generateReport());
 
         JPanel buttonPanel = new JPanel();
         buttonPanel.add(addButton);
@@ -114,17 +124,19 @@ public class GUIManager extends JFrame {
         buttonPanel.add(exportButton);
         buttonPanel.add(importButton);
         buttonPanel.add(saveButton); // 加入按鈕到面板
+        buttonPanel.add(reportButton);
 
         add(scrollPane, BorderLayout.CENTER);
         add(buttonPanel, BorderLayout.SOUTH);
 
-        // 僅在非訪客模式下載入密碼資料
         if (PASSWORD_FILE != null) {
             manager.loadPasswords(PASSWORD_FILE, encryptionKey);
         }
 
+        loadAllPasswords();
         setVisible(true);
     }
+
     private void addPassword() {
         JTextField siteField = new JTextField();
         JTextField accountField = new JTextField();
@@ -212,14 +224,68 @@ public class GUIManager extends JFrame {
             }
         }
     }
+    private void generateReport() {
+        DefaultCategoryDataset strengthDataset = new DefaultCategoryDataset();
+        DefaultPieDataset categoryDataset = new DefaultPieDataset();
+        Map<Integer, Integer> strengthCounts = new HashMap<>();
+        Map<String, Integer> categoryCounts = new HashMap<>();
+
+        for (int i = 1; i <= 100; i++) {
+            strengthCounts.put(i, 0);
+        }
+
+        for (PasswordManager.PasswordEntry entry : manager.getPasswords()) {
+            try {
+                String decryptedPassword = Utils.decrypt(entry.getPassword(), encryptionKey);
+                int strength = Utils.calculateStrength(decryptedPassword);
+                strengthCounts.put(strength, strengthCounts.get(strength) + 1);
+            } catch (Exception e) {
+                int strength = Utils.calculateStrength(entry.getPassword());
+                strengthCounts.put(strength, strengthCounts.get(strength) + 1);
+            }
+
+            categoryCounts.put(entry.getCategory(), categoryCounts.getOrDefault(entry.getCategory(), 0) + 1);
+        }
+
+        for (int i = 1; i <= 100; i++) {
+            strengthDataset.addValue(strengthCounts.get(i), "Passwords", i + "%");
+        }
+
+        for (Map.Entry<String, Integer> entry : categoryCounts.entrySet()) {
+            categoryDataset.setValue(entry.getKey(), entry.getValue());
+        }
+
+        JFreeChart strengthChart = ChartFactory.createLineChart(
+            "Password Strength Distribution",
+            "Strength (%)",
+            "Count",
+            strengthDataset
+        );
+
+        JFreeChart categoryChart = ChartFactory.createPieChart(
+            "Category Distribution",
+            categoryDataset,
+            true,
+            true,
+            false
+        );
+
+        JFrame frame = new JFrame("Report");
+        frame.setLayout(new GridLayout(1, 2));
+        frame.add(new ChartPanel(strengthChart));
+        frame.add(new ChartPanel(categoryChart));
+        frame.pack();
+        frame.setVisible(true);
+    }
     private void loadAllPasswords() {
         tableModel.setRowCount(0);
         for (PasswordManager.PasswordEntry entry : manager.getPasswords()) {
             try {
                 String decryptedPassword = Utils.decrypt(entry.getPassword(), encryptionKey);
-                tableModel.addRow(new Object[]{entry.getSite(), entry.getAccount(), decryptedPassword, entry.getCategory()});
+                int strength = Utils.calculateStrength(decryptedPassword);
+                tableModel.addRow(new Object[]{entry.getSite(), entry.getAccount(), decryptedPassword, entry.getCategory(), strength + "%"});
             } catch (Exception e) {
-                tableModel.addRow(new Object[]{entry.getSite(), entry.getAccount(), entry.getPassword(), entry.getCategory()});
+                tableModel.addRow(new Object[]{entry.getSite(), entry.getAccount(), entry.getPassword(), entry.getCategory(), Utils.calculateStrength(entry.getPassword())+"%"});
             }
         }
     }
@@ -232,16 +298,28 @@ public class GUIManager extends JFrame {
                 if (entry.getCategory().equalsIgnoreCase(category)) {
                     try {
                         String decryptedPassword = Utils.decrypt(entry.getPassword(), encryptionKey);
-                        tableModel.addRow(new Object[]{entry.getSite(), entry.getAccount(), decryptedPassword, entry.getCategory()});
+                        tableModel.addRow(new Object[]{entry.getSite(), entry.getAccount(), decryptedPassword, entry.getCategory(), Utils.calculateStrength(entry.getPassword())+"%"});
                     } catch (Exception e) {
-                        tableModel.addRow(new Object[]{entry.getSite(), entry.getAccount(), entry.getPassword(), entry.getCategory()});
+                        tableModel.addRow(new Object[]{entry.getSite(), entry.getAccount(), entry.getPassword(), entry.getCategory(),Utils.calculateStrength(entry.getPassword())+"%"});
                     }
                 }
             }
         }
     }
 
-
+    private void applyDarkMode() {
+        try {
+            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+            UIManager.put("control", new Color(45, 45, 45));
+            UIManager.put("info", new Color(45, 45, 45));
+            UIManager.put("nimbusBase", new Color(35, 35, 35));
+            UIManager.put("nimbusBlueGrey", new Color(55, 55, 55));
+            UIManager.put("nimbusLightBackground", new Color(45, 45, 45));
+            UIManager.put("text", new Color(255, 255, 255));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
     private void searchPasswords() {
         String keyword = JOptionPane.showInputDialog(this, "Enter keyword to search:", "Search Passwords", JOptionPane.QUESTION_MESSAGE);
         if (keyword != null && !keyword.isEmpty()) {
@@ -250,9 +328,9 @@ public class GUIManager extends JFrame {
                 if (entry.getSite().contains(keyword) || entry.getAccount().contains(keyword)) {
                     try {
                         String decryptedPassword = Utils.decrypt(entry.getPassword(), encryptionKey);
-                        tableModel.addRow(new Object[]{entry.getSite(), entry.getAccount(), decryptedPassword, entry.getCategory()});
+                        tableModel.addRow(new Object[]{entry.getSite(), entry.getAccount(), decryptedPassword, entry.getCategory(), Utils.calculateStrength(entry.getPassword())+"%"});
                     } catch (Exception e) {
-                        tableModel.addRow(new Object[]{entry.getSite(), entry.getAccount(), entry.getPassword(), entry.getCategory()});
+                        tableModel.addRow(new Object[]{entry.getSite(), entry.getAccount(), entry.getPassword(), entry.getCategory(), Utils.calculateStrength(entry.getPassword())+"%"});
                     }
                 }
             }
