@@ -40,15 +40,16 @@ public class Utils {
         byte[] encrypted = cipher.doFinal(data.getBytes());
         return Base64.getEncoder().encodeToString(encrypted);
     }
-    public static int calculateStrength(String password) {
+  public static int calculateStrength(String password) {
         int score = 0;
-        if (password.length() >= 8) score += 20;
-        if (password.length() >= 12) score += 20;
-        if (password.matches(".*[A-Z].*")) score += 20;
-        if (password.matches(".*[a-z].*")) score += 20;
-        if (password.matches(".*\\d.*")) score += 10;
-        if (password.matches(".*[@#$%&*!?.].*")) score += 10;
-        return score;
+        int lengthScore = Math.min(password.length() * 2, 40); // 長度最多給 40 分
+        score += lengthScore;
+        if (password.matches(".*[A-Z].*")) score += 15; // 大寫字母
+        if (password.matches(".*[a-z].*")) score += 15; // 小寫字母
+        if (password.matches(".*\\d.*")) score += 15;  // 數字
+        if (password.matches(".*[@#$%&*!?.].*")) score += 15; // 特殊字符
+
+        return Math.min(score, 100); // 確保結果在 0-100 之間
     }
     public static String decrypt(String encryptedData, String key) throws Exception {
         SecretKeySpec secretKey = new SecretKeySpec(key.getBytes(), "AES");

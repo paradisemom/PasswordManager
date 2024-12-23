@@ -230,7 +230,8 @@ public class GUIManager extends JFrame {
         Map<Integer, Integer> strengthCounts = new HashMap<>();
         Map<String, Integer> categoryCounts = new HashMap<>();
 
-        for (int i = 1; i <= 100; i++) {
+        // 初始化強度區間計數
+        for (int i = 0; i <= 100; i++) {
             strengthCounts.put(i, 0);
         }
 
@@ -247,7 +248,8 @@ public class GUIManager extends JFrame {
             categoryCounts.put(entry.getCategory(), categoryCounts.getOrDefault(entry.getCategory(), 0) + 1);
         }
 
-        for (int i = 1; i <= 100; i++) {
+        // 將數據添加到圖表數據集
+        for (int i = 0; i <= 100; i++) {
             strengthDataset.addValue(strengthCounts.get(i), "Passwords", i + "%");
         }
 
