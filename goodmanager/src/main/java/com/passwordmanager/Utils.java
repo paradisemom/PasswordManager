@@ -1,4 +1,6 @@
 package com.passwordmanager;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Base64;
 import javax.crypto.Cipher;
@@ -61,5 +63,42 @@ public class Utils {
         keyGen.init(128);
         SecretKey secretKey = keyGen.generateKey();
         return Base64.getEncoder().encodeToString(secretKey.getEncoded());
+    }
+    // 產生隨機 Salt
+    private static String generateSalt() {
+        byte[] salt = new byte[16];
+        new SecureRandom().nextBytes(salt);
+        return Base64.getEncoder().encodeToString(salt);
+    }
+
+    // 對密碼進行雜湊處理
+    public static String hashPassword(String password) {
+        try {
+            String salt = generateSalt();
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            md.update(Base64.getDecoder().decode(salt));
+            byte[] hashedPassword = md.digest(password.getBytes());
+            return salt + ":" + Base64.getEncoder().encodeToString(hashedPassword);
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("Hashing error: " + e.getMessage());
+        }
+    }
+
+    // 驗證密碼
+    public static boolean verifyPassword(String password, String storedHash) {
+        try {
+            String[] parts = storedHash.split(":");
+            String salt = parts[0];
+            String hash = parts[1];
+
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            md.update(Base64.getDecoder().decode(salt));
+            byte[] hashedPassword = md.digest(password.getBytes());
+
+            String computedHash = Base64.getEncoder().encodeToString(hashedPassword);
+            return hash.equals(computedHash);
+        } catch (NoSuchAlgorithmException | ArrayIndexOutOfBoundsException e) {
+            throw new RuntimeException("Verification error: " + e.getMessage());
+        }
     }
 }

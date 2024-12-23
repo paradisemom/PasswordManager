@@ -13,25 +13,28 @@ public class Main {
     public static void main(String[] args) {
         LoginManager loginManager = new LoginManager();
         String username = null;
-    
-        while (username == null) {
-            String[] options = {"Login", "Register", "Guest Mode"};
-            int choice = JOptionPane.showOptionDialog(null, "Welcome to Password Manager", "Login",
-                    JOptionPane.DEFAULT_OPTION, JOptionPane.INFORMATION_MESSAGE, null, options, options[0]);
-    
-            if (choice == 0) { // Login
-                username = attemptLogin(loginManager);
-            } else if (choice == 1) { // Register
-                registerUser(loginManager);
-            } else if (choice == 2) { // Guest Mode
-                new GUIManager(new PasswordManager(), "guest");
-                return;
+
+        String[] options = {"Login", "Register", "Guest Mode"};
+        int choice = JOptionPane.showOptionDialog(null, "Welcome to Password Manager", "Login",
+                JOptionPane.DEFAULT_OPTION, JOptionPane.INFORMATION_MESSAGE, null, options, options[0]);
+
+        if (choice == 0) { // Login
+            username = attemptLogin(loginManager);
+            if (username != null) {
+                new GUIManager(new PasswordManager(), username);
+            } else {
+                System.exit(0); // Login failed, exit application
             }
+        } else if (choice == 1) { // Register
+            registerUser(loginManager);
+            System.exit(0); // Exit after registration
+        } else if (choice == 2) { // Guest Mode
+            new GUIManager(new PasswordManager(), "guest");
+        } else {
+            System.exit(0); // Exit on close or cancel
         }
-    
-        new GUIManager(new PasswordManager(), username);
     }
-    
+
     private static String attemptLogin(LoginManager loginManager) {
         String username = JOptionPane.showInputDialog("Enter Username:");
         String password = JOptionPane.showInputDialog("Enter Password:");
@@ -43,7 +46,7 @@ public class Main {
             return null;
         }
     }
-    
+
     private static void registerUser(LoginManager loginManager) {
         String username = JOptionPane.showInputDialog("Choose Username:");
         String password = JOptionPane.showInputDialog("Choose Password:");

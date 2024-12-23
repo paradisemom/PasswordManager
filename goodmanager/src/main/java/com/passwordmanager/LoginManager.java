@@ -5,6 +5,7 @@ import java.io.*;
 import java.util.HashMap;
 import java.util.Map;
 import com.google.gson.Gson;
+import com.passwordmanager.Utils; // 引入 Utils 用於雜湊與驗證
 
 public class LoginManager {
     private static final String USER_DATA_FILE = "users.json";
@@ -16,13 +17,17 @@ public class LoginManager {
 
     public boolean register(String username, String password) {
         if (userData.containsKey(username)) return false;
-        userData.put(username, password);
+        // 生成雜湊並存入
+        String hashedPassword = Utils.hashPassword(password);
+        userData.put(username, hashedPassword);
         saveUserData();
         return true;
     }
 
     public boolean login(String username, String password) {
-        return userData.containsKey(username) && userData.get(username).equals(password);
+        if (!userData.containsKey(username)) return false;
+        // 驗證雜湊
+        return Utils.verifyPassword(password, userData.get(username));
     }
 
     private Map<String, String> loadUserData() {
