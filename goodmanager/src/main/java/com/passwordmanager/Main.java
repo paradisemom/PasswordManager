@@ -14,24 +14,26 @@ public class Main {
         LoginManager loginManager = new LoginManager();
         String username = null;
 
-        String[] options = {"Login", "Register", "Guest Mode"};
-        int choice = JOptionPane.showOptionDialog(null, "Welcome to Password Manager", "Login",
-                JOptionPane.DEFAULT_OPTION, JOptionPane.INFORMATION_MESSAGE, null, options, options[0]);
+        while (true) {
+            String[] options = {"Login", "Register", "Guest Mode", "Exit"};
+            int choice = JOptionPane.showOptionDialog(null, "Welcome to Password Manager", "Login",
+                    JOptionPane.DEFAULT_OPTION, JOptionPane.INFORMATION_MESSAGE, null, options, options[0]);
 
-        if (choice == 0) { // Login
-            username = attemptLogin(loginManager);
-            if (username != null) {
-                new GUIManager(new PasswordManager(), username);
-            } else {
-                System.exit(0); // Login failed, exit application
+            if (choice == 0) { // Login
+                username = attemptLogin(loginManager);
+                if (username != null) {
+                    new GUIManager(new PasswordManager(), username);
+                    break; // Exit loop after successful login
+                }
+            } else if (choice == 1) { // Register
+                registerUser(loginManager);
+                continue; // Go back to the main menu after registration
+            } else if (choice == 2) { // Guest Mode
+                new GUIManager(new PasswordManager(), "guest");
+                break; // Exit loop to guest mode
+            } else { // Exit option
+                System.exit(0);
             }
-        } else if (choice == 1) { // Register
-            registerUser(loginManager);
-            System.exit(0); // Exit after registration
-        } else if (choice == 2) { // Guest Mode
-            new GUIManager(new PasswordManager(), "guest");
-        } else {
-            System.exit(0); // Exit on close or cancel
         }
     }
 
@@ -51,7 +53,7 @@ public class Main {
         String username = JOptionPane.showInputDialog("Choose Username:");
         String password = JOptionPane.showInputDialog("Choose Password:");
         if (loginManager.register(username, password)) {
-            JOptionPane.showMessageDialog(null, "Registration successful!");
+            JOptionPane.showMessageDialog(null, "Registration successful! Please log in.");
         } else {
             JOptionPane.showMessageDialog(null, "Username already exists.");
         }
