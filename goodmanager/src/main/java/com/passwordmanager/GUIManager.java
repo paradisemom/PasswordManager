@@ -285,7 +285,7 @@ public class GUIManager extends JFrame {
             try {
                 String decryptedPassword = Utils.decrypt(entry.getPassword(), encryptionKey);
                 int strength = Utils.calculateStrength(decryptedPassword);
-                tableModel.addRow(new Object[]{entry.getSite(), entry.getAccount(), decryptedPassword, entry.getCategory(), strength + "%"});
+                tableModel.addRow(new Object[]{entry.getSite(), entry.getAccount(), decryptedPassword, entry.getCategory(), Utils.calculateStrength(entry.getPassword())+"%"});
             } catch (Exception e) {
                 tableModel.addRow(new Object[]{entry.getSite(), entry.getAccount(), entry.getPassword(), entry.getCategory(), Utils.calculateStrength(entry.getPassword())+"%"});
             }

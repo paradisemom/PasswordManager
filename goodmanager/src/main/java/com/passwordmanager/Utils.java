@@ -42,7 +42,7 @@ public class Utils {
     }
   public static int calculateStrength(String password) {
         int score = 0;
-        int lengthScore = Math.min(password.length() * 2, 40); // 長度最多給 40 分
+        int lengthScore = password.length() * 2; // 長度
         score += lengthScore;
         if (password.matches(".*[A-Z].*")) score += 15; // 大寫字母
         if (password.matches(".*[a-z].*")) score += 15; // 小寫字母
